@@ -28,3 +28,10 @@ Run the project
 ```bash
 npm run serve
 ```
+
+### Release
+
+```bash
+npm run build
+node index.js
+```
