@@ -5,14 +5,12 @@
         <v-app-bar-nav-icon @click.stop="drawer = !drawer">
           <v-icon>mdi-cog</v-icon>
         </v-app-bar-nav-icon>
-        <v-toolbar-title>{{$t("title")}}</v-toolbar-title>
+        <v-toolbar-title>{{ $t("title") }}</v-toolbar-title>
         <v-spacer></v-spacer>
         <v-menu offset-y>
           <template v-slot:activator="{ on, attrs }">
             <v-btn color="grey lighten-3" v-bind="attrs" v-on="on">
-              <v-icon left>
-                mdi-web
-              </v-icon>
+              <v-icon left> mdi-web </v-icon>
               {{ selectedLanguage }}
             </v-btn>
           </template>
@@ -36,7 +34,7 @@
       <v-list nav dense>
         <v-list-item-group active-class="deep-purple--text text--accent-4">
           <v-list-item>
-            <div class="h2">{{$t("setting")}}</div>
+            <div class="h2">{{ $t("setting") }}</div>
           </v-list-item>
 
           <v-select
@@ -67,21 +65,32 @@
             outlined
           ></v-select>
 
+          <v-select
+            :items="[1, 2, 3]"
+            type="number"
+            v-model="genOptions.opCount"
+            :label="$t('opCount')"
+            outlined
+          ></v-select>
+
           <v-text-field
             v-model="genOptions.numCount"
             type="number"
             :label="$t('numCount')"
             outlined
           ></v-text-field>
+
           <v-list-item>
-            <div class="h2">{{$t('page')}}</div>
+            <div class="h2">{{ $t("page") }}</div>
           </v-list-item>
+
           <v-text-field
             v-model="pageOptions.pageCount"
             type="number"
             :label="$t('pageCount')"
             outlined
           ></v-text-field>
+
           <v-text-field
             v-model="pageOptions.perPage"
             type="number"
@@ -98,7 +107,7 @@
 
           <v-row align="center" justify="space-around">
             <v-btn @click="closeDraw()" color="primary" class="no-print">
-              {{$t("generate")}}
+              {{ $t("generate") }}
             </v-btn>
           </v-row>
         </v-list-item-group>
@@ -108,15 +117,11 @@
       <v-container>
         <v-row class="text-right pa-4 d-print-none justify-end">
           <v-btn @click="print" color="primary" class="no-print mr-4">
-            <v-icon left>
-              mdi-printer
-            </v-icon>
+            <v-icon left> mdi-printer </v-icon>
             {{ $t("print") }}
           </v-btn>
           <v-btn @click="genProblems()" color="primary" class="no-print">
-            <v-icon left>
-              mdi-file-document
-            </v-icon>
+            <v-icon left> mdi-file-document </v-icon>
             {{ $t("generate") }}
           </v-btn>
         </v-row>
@@ -136,7 +141,7 @@
               :cols="12 / row.length"
               class="text-left"
             >
-              {{ expr }}
+              <div class="text-h5 pl-4 pr-4 pt-2 pb-2">{{ expr }}</div>
             </v-col>
           </v-row>
         </div>
@@ -146,6 +151,7 @@
 </template>
 
 <script>
+import { mapMutations, mapGetters } from "vuex";
 const PLUS = 0x01;
 const MINUS = 0x02;
 const MUTLI = 0x04;
@@ -159,6 +165,7 @@ export default {
         hasDecimal: false,
         operator: PLUS + MINUS + MUTLI + DIVID,
         hasNegative: false,
+        opCount: 1,
       },
       pageOptions: {
         perPage: 12, // Line Count
@@ -174,8 +181,8 @@ export default {
         { value: DIVID, text: "/" },
       ],
       trueFalse: [
-        { value: true, text: "True" },
-        { value: false, text: "False" },
+        { value: true, text: this.$t("txtTrue") },
+        { value: false, text: this.$t("txtFalse") },
       ],
       exprInRows: [2, 3, 4, 6],
       selectedOptions: [PLUS, MINUS],
@@ -188,6 +195,14 @@ export default {
   },
   mounted() {
     // this.genProblems();
+    this.genOptions = this.getGenOptions;
+    this.pageOptions = this.getPageOptions;
+  },
+  computed: {
+    ...mapGetters({
+      getGenOptions: "getGenOptions",
+      getPageOptions: "getPageOptions",
+    }),
   },
   methods: {
     async print() {
@@ -199,6 +214,8 @@ export default {
     },
     closeDraw() {
       this.drawer = false;
+      this.setGenOptions(this.genOptions);
+      this.setPageOptions(this.pageOptions);
       this.genProblems();
     },
     genProblems() {
@@ -221,34 +238,106 @@ export default {
       }
     },
     genProblem() {
-      let expr = "";
-      let retVal = "";
-      while (retVal == "") {
-        expr = this.getExpr(this.genOptions);
-        var val = eval(expr);
+      let expr = this.genProblemImpl();
+      while (expr == null) {
+        expr = this.genProblemImpl();
+      }
+
+      return expr;
+    },
+    genProblemImpl() {
+      let isFinished = false;
+      let preNum = null;
+      let lastOpCount = this.genOptions.opCount;
+      let exprs = [];
+      let tryCount = 10;
+      while (!isFinished) {
+        let expr = this.getExpr(this.genOptions, preNum);
+        var val = eval(expr[0] + expr[1] + expr[2]);
         if (val < 0) {
+          if (tryCount <= 0) {
+            isFinished = true;
+            exprs = null;
+            break;
+          }
           if (!this.genOptions.hasNegative) {
+            tryCount--;
             continue;
           }
         }
 
-        retVal = val;
+        if (Math.floor(val) != val) {
+          if (tryCount <= 0) {
+            isFinished = true;
+            exprs = null;
+            break;
+          }
+          if (!this.genOptions.hasDecimal) {
+            tryCount--;
+            continue;
+          }
+        }
+
+        if (preNum == null) {
+          exprs.push(expr[0]);
+        }
+        exprs.push(expr[1]);
+        exprs.push(expr[2]);
+        preNum = val;
+        lastOpCount--;
+        if (lastOpCount <= 0) {
+          isFinished = true;
+          break;
+        }
       }
 
-      // return expr + "=" + val;
-      return expr + "=";
+      if (exprs == null) {
+        return null;
+      } else {
+        let retVal = "";
+        let length = exprs.length;
+        let quoteCount = 0;
+        let quotas = new Array(quoteCount).fill(false);
+        let isMultiOrDiv = false;
+        for (let index = (length - 1) / 2 - 1; index >= 0; index--) {
+          let op = exprs[1 + index * 2];
+          if (op == "*" || op == "/") {
+            isMultiOrDiv = true;
+          } else {
+            if (isMultiOrDiv) {
+              quotas[index] = true;
+              quoteCount++;
+            }
+          }
+        }
+        exprs.forEach((e, index) => {
+          if (index == 0) {
+            for (let index = 0; index < quoteCount; index++) {
+              retVal += "(";
+            }
+          }
+          if (index >= 3 && index % 2 == 1 && quotas[(index - 1) / 2 - 1]) {
+            retVal += ")";
+          }
+          retVal += e;
+        });
+        return retVal + "=";
+      }
     },
-    getExpr(options) {
-      let num1 = this.genNum(options.numCount, options.hasDecimal);
+    getExpr(options, preNum) {
+      let num1 = preNum;
+      if (preNum == null) {
+        num1 = this.genNum(options.numCount, options.hasDecimal);
+      }
       let num2 = this.genNum(options.numCount, options.hasDecimal);
       let operator = this.genOperator(options.operator);
-      return num1 + operator + num2;
+      return [num1, operator, num2];
     },
     genOperator(operator) {
       let retVal = "";
       if (operator == 0) return "";
       while (retVal == "") {
-        let r = this.getRandomInt(1, 4);
+        let r = this.getRandomInt(0, 4);
         let op = Math.pow(2, r);
         switch (op) {
           case PLUS:
@@ -289,6 +378,7 @@ export default {
       max = Math.floor(max);
       return Math.floor(Math.random() * (max - min)) + min;
     },
+    ...mapMutations(["setGenOptions", "setPageOptions"]),
   },
 };
 </script>
@@ -303,11 +393,14 @@ export default {
     "operators": "Operators",
     "hasDeciaml": "Has Decimal",
     "hasNegative": "Has Negative",
+    "opCount": "Operator Count",
     "numCount": "Number Count",
     "page": "Page Setting",
     "pageCount": "Page Count",
     "prePage": "Rows in Page",
-    "preRow": "Expression in Row"
+    "preRow": "Expression in Row",
+    "txtTrue": "True",
+    "txtFalse": "False"
   },
   "cn":{
     "print": "打印",
@@ -317,11 +410,14 @@ export default {
     "operators": "操作符号",
     "hasDeciaml": "含有小数",
     "hasNegative": "含有负数",
+    "opCount": "符号个数",
     "numCount": "数字个数",
     "page": "页面设置",
     "pageCount": "页数",
     "prePage": "行数",
-    "preRow": "每行"
+    "preRow": "每行",
+    "txtTrue": "是",
+    "txtFalse": "否"
   }
 }
 </i18n>
