@@ -1,5 +1,5 @@
 # math-generator
-Generator the math problem for my daughter. Please check the https://math.yangqianming.com
+Generator the math problem for my daughter. Please check the https://eircyangqm.github.io/math-generator/
 
 ## Quick Start
 
